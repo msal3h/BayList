@@ -1,65 +1,163 @@
-import Image from "next/image";
+"use client";
+
+import { useState, useMemo } from "react";
+import { Spot, Category, City } from "@/lib/types";
+import { SAMPLE_SPOTS } from "@/lib/data";
+import SpotCard from "@/components/SpotCard";
+import SpotFilters from "@/components/SpotFilters";
+import SpotForm from "@/components/SpotForm";
+
+type VisitedFilter = "all" | "visited" | "not-visited";
 
 export default function Home() {
+  const [spots, setSpots] = useState<Spot[]>(SAMPLE_SPOTS);
+  const [showForm, setShowForm] = useState(false);
+  const [search, setSearch] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState<Category | "all">("all");
+  const [cityFilter, setCityFilter] = useState<City | "all">("all");
+  const [visitedFilter, setVisitedFilter] = useState<VisitedFilter>("all");
+
+  const filtered = useMemo(() => {
+    return spots.filter((s) => {
+      const q = search.toLowerCase();
+      if (
+        q &&
+        !s.name.toLowerCase().includes(q) &&
+        !s.notes?.toLowerCase().includes(q) &&
+        !s.city.toLowerCase().includes(q)
+      )
+        return false;
+      if (categoryFilter !== "all" && s.category !== categoryFilter)
+        return false;
+      if (cityFilter !== "all" && s.city !== cityFilter) return false;
+      if (visitedFilter === "visited" && !s.visited) return false;
+      if (visitedFilter === "not-visited" && s.visited) return false;
+      return true;
+    });
+  }, [spots, search, categoryFilter, cityFilter, visitedFilter]);
+
+  function handleToggleVisited(id: string) {
+    setSpots((prev) =>
+      
+      prev.map((s) =>
+        s.id === id
+          ? {
+              ...s,
+              visited: !s.visited,
+              rating:
+                !s.visited && s.rating === "want to go" ? "liked" : s.rating,
+            }
+          : s,
+      ),
+    );
+  }
+
+  function handleAddSpot(newSpot: Omit<Spot, "id" | "created_at">) {
+    const spot: Spot = {
+      ...newSpot,
+      id: crypto.randomUUID(),
+      created_at: new Date().toISOString(),
+      
+    };
+    setSpots((prev) => [spot, ...prev]);
+    setShowForm(false);
+  }
+
+  const visitedCount = spots.filter((s) => s.visited).length;
+  const toGoCount = spots.length - visitedCount;
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
+    <main className="min-h-screen bg-stone-50">
+      <header className="bg-white border-b border-stone-100 sticky top-0 z-40">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-stone-900 font-bold text-xl tracking-tight"></h1>
+            <p className="text-stone-400 text-xs mt-0.5">
+              your bay area cool spot tracker
+            </p>
+          </div>
+          <button
+            onClick={() => setShowForm(true)}
+            className="flex items-center gap-1.5 bg-stone-900 text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-stone-700 transition-colors cursor-pointer"
+          >
+            <span className="text-base leading-none">+</span>
+            <span>Add spot</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
+        <div className="flex gap-4">
+          <div className="bg-white rounded-xl border border-stone-100 px-4 py-3 flex flex-col gap-0.5">
+            <span className="text-stone-900 font-bold text-xl">
+              {spots.length}
+            </span>
+            <span className="text-stone-400 text-xs">total spots</span>
+          </div>
+          <div className="bg-white rounded-xl border border-stone-100 px-4 py-3 flex flex-col gap-0.5">
+            <span className="text-emerald-600 font-bold text-xl">
+              {visitedCount}
+            </span>
+            <span className="text-stone-400 text-xs">visited</span>
+          </div>
+          <div className="bg-white rounded-xl border border-stone-100 px-4 py-3 flex flex-col gap-0.5">
+            <span className="text-amber-500 font-bold text-xl">
+              {toGoCount}
+            </span>
+            <span className="text-stone-400 text-xs">to explore</span>
+          </div>
+        </div>
+
+        
+        <SpotFilters
+          search={search}
+          onSearchChange={setSearch}
+          categoryFilter={categoryFilter}
+          onCategoryChange={setCategoryFilter}
+          cityFilter={cityFilter}
+          onCityChange={setCityFilter}
+          visitedFilter={visitedFilter}
+          onVisitedFilterChange={setVisitedFilter}
+          totalCount={spots.length}
+          filteredCount={filtered.length}
         />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
+
+       
+        {filtered.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {filtered.map((spot) => (
+              <SpotCard
+                key={spot.id}
+                spot={spot}
+                onToggleVisited={handleToggleVisited}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-16">
+            <p className="text-4xl mb-3">🗺️</p>
+            <p className="text-stone-500 text-sm">
+              No spots match your filters.
+            </p>
+            <button
+              onClick={() => {
+                setSearch("");
+                setCategoryFilter("all");
+                setCityFilter("all");
+                setVisitedFilter("all");
+              }}
+              className="mt-3 text-xs text-stone-400 underline hover:text-stone-600 cursor-pointer"
             >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
-        </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
-    </div>
+              Clear filters
+            </button>
+          </div>
+        )}
+      </div>
+
+     
+      {showForm && (
+        <SpotForm onSubmit={handleAddSpot} onClose={() => setShowForm(false)} />
+      )}
+    </main>
   );
 }
